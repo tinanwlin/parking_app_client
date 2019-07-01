@@ -1,88 +1,144 @@
-import React, { Component } from 'react';
-import { Map, GoogleApiWrapper, InfoWindow, Marker } from 'google-maps-react';
-import axios from 'axios';
+import React, { Component } from "react";
+import {
+  withScriptjs,
+  withGoogleMap,
+  GoogleMap,
+  Marker,
+  Circle,
+  InfoWindow
+} from "react-google-maps";
 
-const mapStyles = {
-  width: '100%',
-  height: '100%'
-};
+import axios from "axios";
+import PinLocation from "./PinLocation";
 
-export class MapContainer extends Component {
+class MapContainer extends Component {
   constructor(props) {
-    super(props)
-      this.state = {
-        showingInfoWindow: false,
-        activeMarker: {},
-        selectedPlace: {},
-        markers: []
-      };
+    super(props);
+    this.state = {
+      infoWindowIsOpen: false,
+      infoWindowLocation: {},
+      markers: [],
+      place: {
+        name: "",
+        latitude: null,
+        longitude: null
+      }
+    };
   }
 
   componentDidMount() {
-    axios
-      .get(`http://localhost:3000/api/v1/places`)
-      .then(res => {
-        const markers = res.data;
-        this.setState({ 
-          ...this.state,
-          markers: [ ...this.state.markers, ...markers ]
-        })
-      })
+    this.getMarkers();
+    this.getCurrentLocation();
   }
 
-  onMarkerClick = (props, marker, e) => {
+  onMarkerClick = (event, place) => {
+    /* 
+    place - interface
+    {
+      name: [string],
+      lat: [string],
+      lng: [string],
+      (note: [string] future)
+    }
+    Will be used in the future for setting place in state
+    */
+
     this.setState({
-      showingInfoWindow: true,
-      activeMarker: marker,
-      selectedPlace: props
+      infoWindowIsOpen: true,
+      infoWindowLocation: {
+        lat: event.latLng.lat(),
+        lng: event.latLng.lng()
+      }
     });
-  }
+  };
 
-  onClose = (props) => {
-    if (this.state.showingInfoWindow) {
+  onClose = () => {
+    if (this.state.infoWindowIsOpen) {
       this.setState({
-        showingInfoWindow: false,
-        activeMarker: null
+        infoWindowIsOpen: false
       });
     }
-  }
-  
+  };
+
+  getMarkers = () => {
+    axios.get(`http://localhost:3000/api/v1/places`).then(res => {
+      const markers = res.data;
+      this.setState({
+        markers: markers
+      });
+    });
+  };
+
+  getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(position => {
+        this.setState({
+          place: {
+            name: "Current Location",
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          }
+        });
+      });
+    } else {
+      return "Geolocation is not supported by this browser.";
+    }
+  };
+
   render() {
-    const markers = this.state.markers.map((place) => {
+
+    const markers = this.state.markers.map(place => {
       return (
-        <Marker 
+        <Marker
           key={place.id}
-          onClick={this.onMarkerClick}
-          position={{lat: place.latitude, lng: place.longitude}}
-          name={place.name}
+          position={{
+            lat: Number(place.latitude),
+            lng: Number(place.longitude)
+          }}
+          onClick={event => {
+            this.onMarkerClick(event, place);
+          }}
         />
-      )
-    })
+      );
+    });
+
     return (
-      <Map
-        google={this.props.google}
-        zoom={14}
-        style={mapStyles}
-        initialCenter={{
-         lat: 49.283764,
-         lng: -122.793205
-        }}
-      >
-        {markers}
-        <InfoWindow
-          marker={this.state.activeMarker}
-          visible={this.state.showingInfoWindow}
-          onClose={this.onClose}
+      <div>
+        <GoogleMap
+          defaultZoom={12}
+          defaultCenter={{ lat: 49.283764, lng: -122.793205 }}
         >
-          <div>
-            <h4>{this.state.selectedPlace.name}</h4>
-          </div>
-        </InfoWindow>
-      </Map>
+          <Circle
+            strokeColor="#FF0000"
+            strokeOpacity={0.8}
+            strokeWeight={1}
+            fillColor="#FF0000"
+            fillOpacity={0.35}
+            center={{
+              lat: Number(this.state.place.latitude),
+              lng: Number(this.state.place.longitude)
+            }}
+            radius={100}
+          />
+
+          {markers}
+
+          {this.state.infoWindowIsOpen && (
+            <InfoWindow
+              onCloseClick={this.onClose}
+              position={this.state.infoWindowLocation}
+            >
+              <div>This is the Info Window</div>
+            </InfoWindow>
+          )}
+        </GoogleMap>
+        <PinLocation 
+          currentLocation={this.state.place}
+          onFinish={this.getMarkers}
+        />
+      </div>
     );
   }
 }
 
-export default GoogleApiWrapper({
-  apiKey: 'AIzaSyCpNE5hHJizB6IsropfpbdFKjTXWK1z5Hs'
-})(MapContainer);
+export default withScriptjs(withGoogleMap(MapContainer));
