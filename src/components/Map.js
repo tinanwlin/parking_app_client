@@ -17,13 +17,15 @@ class MapContainer extends Component {
     this.state = {
       infoWindowIsOpen: false,
       infoWindowLocation: {},
+      infoWindowNote: "",
       markers: [],
-      place: {
-        name: "",
+      currentLocation: {
+        note: "",
         latitude: null,
         longitude: null
       }
     };
+    this._map = undefined;
   }
 
   componentDidMount() {
@@ -32,23 +34,13 @@ class MapContainer extends Component {
   }
 
   onMarkerClick = (event, place) => {
-    /* 
-    place - interface
-    {
-      name: [string],
-      lat: [string],
-      lng: [string],
-      (note: [string] future)
-    }
-    Will be used in the future for setting place in state
-    */
-
     this.setState({
       infoWindowIsOpen: true,
       infoWindowLocation: {
         lat: event.latLng.lat(),
         lng: event.latLng.lng()
-      }
+      },
+      infoWindowNote: place.note
     });
   };
 
@@ -72,9 +64,15 @@ class MapContainer extends Component {
   getCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(position => {
+
+        this._map.panTo({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+
         this.setState({
-          place: {
-            name: "Current Location",
+          currentLocation: {
+            note: "Current Location",
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           }
@@ -86,7 +84,6 @@ class MapContainer extends Component {
   };
 
   render() {
-
     const markers = this.state.markers.map(place => {
       return (
         <Marker
@@ -107,6 +104,7 @@ class MapContainer extends Component {
         <GoogleMap
           defaultZoom={12}
           defaultCenter={{ lat: 49.283764, lng: -122.793205 }}
+          ref={(map) => this._map = map}
         >
           <Circle
             strokeColor="#FF0000"
@@ -115,8 +113,8 @@ class MapContainer extends Component {
             fillColor="#FF0000"
             fillOpacity={0.35}
             center={{
-              lat: Number(this.state.place.latitude),
-              lng: Number(this.state.place.longitude)
+              lat: Number(this.state.currentLocation.latitude),
+              lng: Number(this.state.currentLocation.longitude)
             }}
             radius={100}
           />
@@ -128,12 +126,12 @@ class MapContainer extends Component {
               onCloseClick={this.onClose}
               position={this.state.infoWindowLocation}
             >
-              <div>This is the Info Window</div>
+              <div>{this.state.infoWindowNote}</div>
             </InfoWindow>
           )}
         </GoogleMap>
-        <PinLocation 
-          currentLocation={this.state.place}
+        <PinLocation
+          currentLocation={this.state.currentLocation}
           onFinish={this.getMarkers}
         />
       </div>
